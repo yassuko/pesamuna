@@ -39,6 +39,7 @@ h1{margin:0 0 4px;font-size:26px}
 .task:active{transform:scale(.97)}
 .task .e{font-size:48px}
 .task.done{background:var(--ok);color:#fff}
+.amt{font-size:16px;font-weight:700;color:var(--mut)}.task.done .amt{color:#fff}
 .wkr{display:flex;justify-content:space-between}
 .dy{display:flex;flex-direction:column;align-items:center;font-size:12px;color:var(--mut)}
 .dy i{font-style:normal;width:30px;height:30px;border-radius:50%;border:2px solid var(--bar);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700}
@@ -90,12 +91,14 @@ button.s,.panel button{font:inherit;font-size:16px;padding:10px 16px;border-radi
    <div id="gate" class="row"><b id="gq"></b><input id="ga" size="4" inputmode="numeric" aria-label="Vastaus"><button id="go">OK</button></div>
    <div id="adm" style="display:none">
     <div class="row"><input id="nm" aria-label="Nimi"><button id="sn">Tallenna nimi</button></div>
-    <div class="row"><input id="ne" size="3" placeholder="🧹" aria-label="Emoji"><input id="nt" placeholder="Uusi kotityö" aria-label="Kotityö"><button id="add">Lisää tälle lapselle</button><button id="add2">Lisää molemmille</button></div>
-    <div class="row"><label>1 tähti = <select id="rate"></select></label></div>
-    <div class="row" id="del"></div>
+    <div class="row"><input id="ne" size="3" placeholder="🧹" aria-label="Emoji"><input id="nt" placeholder="Uusi kotityö" aria-label="Kotityö"><input id="na" size="5" inputmode="decimal" placeholder="€" aria-label="Palkkio"><button id="add">Lisää tälle lapselle</button><button id="add2">Lisää molemmille</button></div>
+    <div class="row"><label>🧠 Bonuskysymyksen palkkio <input id="qb" size="5" inputmode="decimal" aria-label="Bonuskysymyksen palkkio"> €</label></div>
+    <div class="row"><b>Kotityöt ja palkkiot (€ / kerta)</b></div>
+    <div id="del"></div>
     <div class="row"><b id="due"></b></div>
-    <div class="row"><button id="po">💶 Maksettu ulos, nollaa tähdet</button><button id="tp">🐷 Siirrä pottiin, nollaa tähdet</button></div>
+    <div class="row"><button id="po">💶 Maksettu ulos, nollaa viikko</button><button id="tp">🐷 Siirrä pottiin, nollaa viikko</button></div>
     <div class="row"><input id="wd" size="6" inputmode="decimal" placeholder="Summa €" aria-label="Summa"><button id="wb">Nosta potista</button></div>
+    <div class="row"><button id="rp">🔄 Nollaa profiili</button></div>
    </div>
   </div>
  </div>
@@ -105,15 +108,20 @@ const KEY="askarakaveri-v2",$=id=>document.getElementById(id);
 const ld=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
 const today=()=>ld(new Date());
 const DN=["su","ma","ti","ke","to","pe","la"];
-const T=[["🛏️","Petaa sänky"],["🦷","Harjaa hampaat"],["🧸","Siivoa lelut"],["🍽️","Vie astiat tiskialtaaseen"],["👕","Pyykit koriin"],["🪴","Kastele kasvit"]];
-const mk=(id,name)=>({id,name,ok:false,egg:"pink",qd:"",qr:"",stars:0,total:0,pot:0,log:[],tasks:T.map((x,i)=>({id:i+1,e:x[0],t:x[1]}))});
+const T=[["🛏️","Petaa sänky",10],["🦷","Harjaa hampaat",10],["🧸","Siivoa lelut",20],["🍽️","Vie astiat tiskialtaaseen",25],["👕","Pyykit koriin",15],["🪴","Kastele kasvit",15]];
+const mk=(id,name)=>({id,name,ok:false,egg:"pink",qd:"",qr:"",stars:0,cash:0,total:0,pot:0,log:[],tasks:T.map((x,i)=>({id:i+1,e:x[0],t:x[1],c:x[2]}))});
 let S;try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
 if(!S||!S.kids)S={kids:[mk(1,"Lapsi 1"),mk(2,"Lapsi 2")],cur:1,rate:25};
 const cut=ld(new Date(Date.now()-70*864e5));
-S.kids.forEach(k=>{k.log=(k.log||[]).filter(e=>e[0]>=cut)});
+S.rate=S.rate||25;if(S.qb==null)S.qb=S.rate;
+S.kids.forEach(k=>{k.log=(k.log||[]).filter(e=>e[0]>=cut);
+ if(k.cash==null)k.cash=k.stars*S.rate;
+ k.tasks.forEach(t=>{if(t.c==null)t.c=S.rate});
+ k.log.forEach(e=>{if(e[2]==null){const t=k.tasks.find(x=>x.id===e[1]);e[2]=t?t.c:S.rate}})});
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 const K=()=>S.kids.find(k=>k.id===S.cur)||S.kids[0];
 const eur=c=>(c/100).toLocaleString("fi-FI",{style:"currency",currency:"EUR"});
+const num=c=>(c/100).toFixed(2).replace(".",","),pe=s=>{const v=Math.round(parseFloat(String(s).replace(",","."))*100);return v>0?v:0},val=t=>t.c==null?S.rate:t.c;
 const EGGS={pink:{c:"#ff8fb8",l:["🐭","🐰","🦄"]},blue:{c:"#5aa9ff",l:["🐟","🐬","🐳"]},green:{c:"#4cc77a",l:["🦎","🐊","🐉"]},yellow:{c:"#ffcf3d",l:["🐤","🦆","🦅"]}};
 const egg=(c,x)=>'<svg width="84" height="96" viewBox="0 0 84 96" aria-hidden="true"><path d="M42 4C20 4 6 44 6 62c0 20 16 32 36 32s36-12 36-32C78 44 64 4 42 4z" fill="'+c+'"/><circle cx="30" cy="50" r="6" fill="#fff" opacity=".5"/><circle cx="54" cy="66" r="5" fill="#fff" opacity=".5"/>'+(x?'<path d="M18 44l12 10 10-12 10 12 10-10 8 8" fill="none" stroke="#2b2340" stroke-width="4" stroke-linejoin="round"/>':'')+'</svg>';
 function petDraw(k){const c=EGGS[k.egg]||EGGS.pink,n=k.total,p=$("pet");if(n<8)p.innerHTML=egg(c.c,0);else if(n<20)p.innerHTML=egg(c.c,1);else p.textContent=c.l[n<45?0:n<80?1:2]}
@@ -204,17 +212,17 @@ function todayQ(k){
 }
 function quizDraw(k){const z=$("quiz");z.innerHTML="";if(!k.ok)return;
  const d=today(),c=document.createElement("div");c.className="qz";z.appendChild(c);
- const h=document.createElement("b");h.textContent="🧠 Päivän kysymys";c.appendChild(h);
+ const h=document.createElement("b");h.textContent="🧠 Päivän kysymys"+(S.qb?" · oikea vastaus +"+eur(S.qb):"");c.appendChild(h);
  const p=document.createElement("div");p.className="qq";c.appendChild(p);
  if(k.qd===d){p.textContent=(k.qr||"")+" Uusi kysymys huomenna!";return}
  if(!k.log.some(e=>e[0]===d)){p.textContent="🔒 Tee ensin yksi kotityö, niin avaat päivän kysymyksen ja bonustähden!";return}
  const q=todayQ(k);p.textContent=q[0];
- q[1].forEach((o,i)=>{const b=document.createElement("button");b.className="qo";b.textContent=o;b.onclick=()=>{const ok=i===q[2];if(ok){k.stars++;k.total++}k.qd=d;k.qr=(ok?"✅ Oikein! +1 ⭐ ":"💡 Ei aivan. ")+q[3];save();render()};c.appendChild(b)})}
+ q[1].forEach((o,i)=>{const b=document.createElement("button");b.className="qo";b.textContent=o;b.onclick=()=>{const ok=i===q[2];if(ok){k.stars++;k.total++;k.cash+=S.qb}k.qd=d;k.qr=(ok?"✅ Oikein! +⭐"+(S.qb?" +"+eur(S.qb):"")+" ":"💡 Ei aivan. ")+q[3];save();render()};c.appendChild(b)})}
 /* Viikkotaulu su–la */
 function pop(x,y){const s=document.createElement("div");s.className="pop";s.textContent="⭐";s.style.left=x-20+"px";s.style.top=y-20+"px";document.body.appendChild(s);setTimeout(()=>s.remove(),1000)}
-function add(id,ev){const k=K();k.log.push([today(),id]);k.stars++;k.total++;pop(ev.clientX,ev.clientY);try{navigator.vibrate&&navigator.vibrate(30)}catch(e){}
+function add(id,ev){const k=K(),t=k.tasks.find(x=>x.id===id);if(!t)return;const v=val(t);k.log.push([today(),id,v]);k.stars++;k.total++;k.cash+=v;pop(ev.clientX,ev.clientY);try{navigator.vibrate&&navigator.vibrate(30)}catch(e){}
  const p=$("pet");p.classList.add("hop");setTimeout(()=>p.classList.remove("hop"),300);save();render()}
-function undo(id){const k=K(),d=today();for(let i=k.log.length-1;i>=0;i--)if(k.log[i][0]===d&&k.log[i][1]===id){k.log.splice(i,1);k.stars=Math.max(0,k.stars-1);k.total=Math.max(0,k.total-1);break}save();render()}
+function undo(id){const k=K(),d=today();for(let i=k.log.length-1;i>=0;i--)if(k.log[i][0]===d&&k.log[i][1]===id){k.cash=Math.max(0,k.cash-(k.log[i][2]||0));k.log.splice(i,1);k.stars=Math.max(0,k.stars-1);k.total=Math.max(0,k.total-1);break}save();render()}
 function board(k){
  const L=$("list");L.innerHTML="";const n=new Date(),sun=new Date(n.getFullYear(),n.getMonth(),n.getDate()-n.getDay()),dd=[];
  for(let i=0;i<7;i++)dd.push(ld(new Date(sun.getFullYear(),sun.getMonth(),sun.getDate()+i)));
@@ -223,8 +231,8 @@ function board(k){
  k.tasks.forEach(t=>{
   const cnt=day=>k.log.filter(e=>e[0]===day&&e[1]===t.id).length,tn=cnt(td);
   const c=document.createElement("div");c.className="card";
-  const b=document.createElement("button");b.className="task"+(tn?" done":"");b.innerHTML='<span class="e"></span><span></span>';
-  b.children[0].textContent=t.e;b.children[1].textContent=t.t+(tn>1?" ×"+tn:"");b.onclick=ev=>add(t.id,ev);c.appendChild(b);
+  const b=document.createElement("button");b.className="task"+(tn?" done":"");b.innerHTML='<span class="e"></span><span></span><span class="amt"></span>';
+  b.children[0].textContent=t.e;b.children[1].textContent=t.t+(tn>1?" ×"+tn:"");b.children[2].textContent=eur(val(t));b.onclick=ev=>add(t.id,ev);c.appendChild(b);
   const w=document.createElement("div");w.className="wkr";
   dd.forEach((day,i)=>{const m=cnt(day),s=document.createElement("div");s.className="dy"+(day===td?" now":"")+(m?" on":"")+(day>td?" fut":"");s.innerHTML="<small></small><i></i>";s.children[0].textContent=DN[i];s.children[1].textContent=m||"";w.appendChild(s)});
   c.appendChild(w);
@@ -238,14 +246,20 @@ function render(){
  showSetup(k);petDraw(k);board(k);quizDraw(k);
  $("hello").textContent="Hei, "+k.name+"!";
  $("msg").textContent="Tänään tehty "+k.log.filter(e=>e[0]===td).length+" kotityötä. "+(days===0?"":"Maksupäivään "+days+" pv");
- $("st").textContent="⭐ "+k.stars+" = "+eur(k.stars*S.rate);
+ $("st").textContent="⭐ "+k.stars+" · 💶 "+eur(k.cash);
  $("pt").textContent="🐷 Potti "+eur(k.pot);
- const p=$("pay");p.style.display=dow===6?"block":"none";p.textContent="💶 Maksupäivä! Sinulle kertyi "+eur(k.stars*S.rate)+". Näytä aikuiselle!";
+ const p=$("pay");p.style.display=dow===6?"block":"none";p.textContent="💶 Maksupäivä! Sinulle kertyi "+eur(k.cash)+". Näytä aikuiselle!";
  $("nm").value=k.name;
- $("rate").innerHTML=[10,20,25,50,100].map(c=>'<option value="'+c+'"'+(c===S.rate?" selected":"")+">"+eur(c)+"</option>").join("");
- $("due").textContent=k.name+": maksettavaa "+eur(k.stars*S.rate)+", potissa "+eur(k.pot);
+ $("qb").value=num(S.qb);
+ $("due").textContent=k.name+": maksettavaa "+eur(k.cash)+", potissa "+eur(k.pot);
  const dl=$("del");dl.innerHTML="";
- k.tasks.forEach(t=>{const b=document.createElement("button");b.textContent="🗑️ "+t.e+" "+t.t;b.onclick=()=>{k.tasks=k.tasks.filter(x=>x.id!==t.id);save();render()};dl.appendChild(b)});
+ k.tasks.forEach(t=>{const r=document.createElement("div");r.className="row";
+  const l=document.createElement("span");l.textContent=t.e+" "+t.t;l.style.flex="1";
+  const i=document.createElement("input");i.size=5;i.inputMode="decimal";i.value=num(val(t));i.setAttribute("aria-label","Palkkio: "+t.t);
+  i.onchange=()=>{t.c=pe(i.value);save();render()};
+  const u=document.createElement("span");u.textContent="€";
+  const b=document.createElement("button");b.textContent="🗑️";b.setAttribute("aria-label","Poista "+t.t);b.onclick=()=>{k.tasks=k.tasks.filter(x=>x.id!==t.id);save();render()};
+  r.append(l,i,u,b);dl.appendChild(r)});
 }
 /* Aikuisten osio */
 let unlocked=false;
@@ -253,12 +267,17 @@ function gate(){const a=6+Math.floor(Math.random()*4),b=6+Math.floor(Math.random
 $("tg").onclick=()=>{const p=$("panel"),o=p.style.display==="block";p.style.display=o?"none":"block";if(o){unlocked=false}else{$("gate").style.display=unlocked?"none":"flex";$("adm").style.display=unlocked?"block":"none";gate()}};
 $("go").onclick=()=>{if(+$("ga").value===window._ans){unlocked=true;$("gate").style.display="none";$("adm").style.display="block"}else gate()};
 $("sn").onclick=()=>{const v=$("nm").value.trim();if(v){K().name=v;save();render()}};
-function addTask(all){const t=$("nt").value.trim();if(!t)return;const e=$("ne").value.trim()||"✨",id=Date.now();(all?S.kids:[K()]).forEach(k=>k.tasks.push({id,e,t}));$("nt").value="";$("ne").value="";save();render()}
+function addTask(all){const t=$("nt").value.trim();if(!t)return;const e=$("ne").value.trim()||"✨",id=Date.now(),c=$("na").value.trim()===""?S.rate:pe($("na").value);(all?S.kids:[K()]).forEach(k=>k.tasks.push({id,e,t,c}));$("nt").value="";$("ne").value="";$("na").value="";save();render()}
 $("add").onclick=()=>addTask(false);$("add2").onclick=()=>addTask(true);
-$("rate").onchange=e=>{S.rate=+e.target.value;save();render()};
-$("po").onclick=()=>{K().stars=0;save();render()};
-$("tp").onclick=()=>{const k=K();k.pot+=k.stars*S.rate;k.stars=0;save();render()};
+$("qb").onchange=e=>{S.qb=pe(e.target.value);save();render()};
+$("po").onclick=()=>{const k=K();k.stars=0;k.cash=0;save();render()};
+$("tp").onclick=()=>{const k=K();k.pot+=k.cash;k.stars=0;k.cash=0;save();render()};
 $("wb").onclick=()=>{const v=Math.round(parseFloat($("wd").value.replace(",","."))*100);if(v>0){const k=K();k.pot=Math.max(0,k.pot-v);$("wd").value="";save();render()}};
+let rsT=0;
+$("rp").onclick=()=>{const b=$("rp");
+ if(!rsT){b.textContent="⚠️ Varmista: poistaa nimen, munan, tähdet, potin ja historian";rsT=setTimeout(()=>{rsT=0;b.textContent="🔄 Nollaa profiili"},6000);return}
+ clearTimeout(rsT);rsT=0;b.textContent="🔄 Nollaa profiili";
+ const k=K(),i=S.kids.findIndex(x=>x.id===k.id),n=mk(k.id,"Lapsi "+(i+1));n.tasks=k.tasks;S.kids[i]=n;$("setup").dataset.k="";save();render()};
 render();
 if("serviceWorker" in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("sw.js").catch(()=>{});
 </script>
